@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live YouTube Sub Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: #0f0f0f;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+        }
+
+        .channel-card {
+            background: #1f1f1f;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 1px solid #303030;
+            position: relative;
+        }
+
+        .channel-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255,0,0,0.3);
+        }
+
+        .channel-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            object-fit: cover;
+            border: 2px solid #fff;
+        }
+
+        .rank {
+            font-size: 1.2em;
+            color: #ff0000;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .channel-name {
+            color: #fff;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .subscribers {
+            font-size: 0.9em;
+            color: #aaa;
+            transition: all 0.5s ease;
+            position: relative;
+        }
+
+        .gain {
+            color: #00ff00 !important;
+            animation: gainPulse 0.5s ease-out;
+        }
+
+        .loss {
+            color: #ff0000 !important;
+            animation: lossPulse 0.5s ease-out;
+        }
+
+        .loading {
+            color: white;
+            text-align: center;
+            font-size: 1.2em;
+            padding: 20px;
+        }
+
+        .error {
+            color: #ff0000;
+            text-align: center;
+            padding: 20px;
+        }
+
+        @keyframes gainPulse {
+            0% { transform: scale(1); text-shadow: 0 0 10px rgba(0,255,0,0); }
+            50% { transform: scale(1.1); text-shadow: 0 0 15px rgba(0,255,0,0.5); }
+            100% { transform: scale(1); text-shadow: 0 0 10px rgba(0,255,0,0); }
+        }
+
+        @keyframes lossPulse {
+            0% { transform: scale(1); text-shadow: 0 0 10px rgba(255,0,0,0); }
+            50% { transform: scale(1.1); text-shadow: 0 0 15px rgba(255,0,0,0.5); }
+            100% { transform: scale(1); text-shadow: 0 0 10px rgba(255,0,0,0); }
+        }
+
+        @media (max-width: 1200px) { .grid-container { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 992px) { .grid-container { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 768px) { .grid-container { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .grid-container { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LIVE YOUTUBE SUBSCRIBER BATTLE</h1>
+        <div class="loading" id="loading">Initializing...</div>
+        <div class="error" id="error" style="display: none;"></div>
+        <div class="grid-container" id="gridContainer"></div>
+    </div>
+
+    <script>
+        // CONFIGURATION (REPLACE THESE VALUES)
+        const YT_API_KEY = 'AIzaSyDowOXhMUqPr-3krKyavSvceGaabkFeLUk'; // Get from Google Cloud Console
+        const CHANNEL_IDS = [
+            'UCX6OQ3DkcsbYNE6H8uQQuVA', // MrBeast
+            'UCq-Fj5jknLsUf-MWSyP_8PA', // T-Series
+            'UCo7TRj3cS-f_1D9ZDmuTsjw', // Cocomelon
+            'UCiB8h9jD2Mlxx96ZFnGDSJw', // SET India
+            'UC-lHJZR3Gqxm24_Vd_AJ5Yw', // PewDiePie
+            'UChs0pSaEoNLV4mevBFGaoXA', // Justin Bieber
+            'UCOmHUn--16B90oW2L6FRR3A', // BLACKPINK
+            'UC9UeY0gDgS1qY0XIMReGS_g', // Sony Music India
+            'UCJ5v_MCY6GNUBTO8-D3XoAg', // WWE
+            'UC295-Dw_tDNtZXFeAPAW6Aw', // 5-Minute Crafts
+            'UCk8GzjMKo39Jvpa5uWZICqw', // Kids Diana Show
+            'UCJplp5SjeGSdVdwsfb9Q7lQ', // Like Nastya
+            'UCj22tfcQrWG7EMEKS0qLeEg', // Zee Music Company
+            'UCxqIUE6ZVS1SgPbiGp4_RVA', // ChuChu TV
+            'UC3IZKseVpdzPSBaW9xWQcbg', // HYBE LABELS
+            'UCv5t7C1ZQV4nS1uExIZmkIA', // Canal KondZilla
+            'UCXwM_7Q3e-f4MhQpQpIXp9Q', // Tips Official
+            'UCV9_c1d1lyT3D6KcDFOqymA', // Goldmines
+            'UC6MFZAOHXlKK1FI7Vm0gbRg', // Sony SAB
+            'UC4HZ_Zkj4MlwS7TI8wKEqJA'  // Wave Music
+
+            // Add 48 more channel IDs here...
+        ]; 
+
+        let channels = [];
+        let updateInterval;
+
+        async function fetchChannelData(channelId) {
+            try {
+                const response = await fetch(
+                    `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${YT_API_KEY}`
+                );
+                const data = await response.json();
+                
+                if(data.items?.length > 0) {
+                    return {
+                        id: channelId,
+                        name: data.items[0].snippet.title,
+                        subs: parseInt(data.items[0].statistics.subscriberCount),
+                        logo: data.items[0].snippet.thumbnails.high.url,
+                        prevSubs: parseInt(data.items[0].statistics.subscriberCount)
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.error('API Error:', error);
+                showError('Failed to fetch channel data');
+                return null;
+            }
+        }
+
+        async function initializeApp() {
+            try {
+                showLoading('Fetching initial data...');
+                
+                // Fetch all channel data
+                const channelPromises = CHANNEL_IDS.map(fetchChannelData);
+                const channelResults = await Promise.all(channelPromises);
+                
+                // Process results
+                channels = channelResults.filter(ch => ch !== null)
+                                       .sort((a, b) => b.subs - a.subs)
+                                       .map((ch, i) => ({ ...ch, rank: i + 1 }));
+
+                if(channels.length === 0) {
+                    showError('No valid channel data found');
+                    return;
+                }
+
+                hideLoading();
+                renderGrid();
+                startAutoUpdate();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError('Failed to initialize application');
+            }
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('gridContainer');
+            grid.innerHTML = '';
+            
+            channels.forEach(channel => {
+                const card = document.createElement('div');
+                card.className = 'channel-card';
+                card.innerHTML = `
+                    <div class="rank">#${channel.rank}</div>
+                    <img class="channel-logo" src="${channel.logo}" alt="${channel.name}"
+                         onerror="this.src='https://via.placeholder.com/80?text=LOGO'">
+                    <div class="channel-name">${channel.name}</div>
+                    <div class="subscribers">${formatNumber(channel.subs)}</div>
+                `;
+                card.dataset.channelId = channel.id;
+                grid.appendChild(card);
+            });
+        }
+
+        async function updateData() {
+            try {
+                const updatedChannels = await Promise.all(
+                    channels.map(async channel => {
+                        const newData = await fetchChannelData(channel.id);
+                        return newData ? { 
+                            ...channel,
+                            subs: newData.subs,
+                            prevSubs: channel.subs,
+                            logo: newData.logo || channel.logo
+                        } : channel;
+                    })
+                );
+
+                // Update and sort channels
+                channels = updatedChannels.sort((a, b) => b.subs - a.subs)
+                                         .map((ch, i) => ({ ...ch, rank: i + 1 }));
+
+                updateGrid();
+            } catch (error) {
+                console.error('Update error:', error);
+                showError('Failed to update data');
+            }
+        }
+
+        function updateGrid() {
+            channels.forEach(channel => {
+                const card = document.querySelector(`[data-channel-id="${channel.id}"]`);
+                if(!card) return;
+
+                // Update elements
+                card.querySelector('.rank').textContent = `#${channel.rank}`;
+                const subsElement = card.querySelector('.subscribers');
+                const prevSubs = parseInt(subsElement.textContent.replace(/,/g, ''));
+                
+                subsElement.textContent = formatNumber(channel.subs);
+                subsElement.classList.remove('gain', 'loss');
+                
+                if(channel.subs > prevSubs) {
+                    subsElement.classList.add('gain');
+                } else if(channel.subs < prevSubs) {
+                    subsElement.classList.add('loss');
+                }
+
+                // Update logo if changed
+                const logo = card.querySelector('.channel-logo');
+                if(logo.src !== channel.logo) {
+                    logo.src = channel.logo;
+                }
+            });
+
+            // Re-sort grid
+            const sortedCards = channels.map(ch => 
+                document.querySelector(`[data-channel-id="${ch.id}"]`)
+            ).filter(c => c);
+            
+            document.getElementById('gridContainer').innerHTML = '';
+            sortedCards.forEach(c => document.getElementById('gridContainer').appendChild(c));
+        }
+
+        function formatNumber(num) {
+            return num.toLocaleString('en-US');
+        }
+
+        function startAutoUpdate() {
+            if(updateInterval) clearInterval(updateInterval);
+            updateInterval = setInterval(updateData, 300000); // 5 minutes
+        }
+
+        function showLoading(message) {
+            document.getElementById('loading').textContent = message;
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = message;
+        }
+
+        // Initialize application
+        initializeApp();
+    </script>
+</body>
+</html>
